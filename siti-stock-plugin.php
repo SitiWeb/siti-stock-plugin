@@ -3,7 +3,7 @@
  * Plugin Name:       Siti Stock Plugin
  * Plugin URI:        https://github.com/SitiWeb/siti-stock-plugin
  * Description:       Synchroniseert WooCommerce voorraad met het externe Siti voorraadplatform.
- * Version:           0.1.0
+ * Version:           1.0.0
  * Author:            Siti Web
  * Author URI:        https://www.siti.nl
  * Requires PHP:      8.1
