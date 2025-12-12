@@ -1,0 +1,102 @@
+name: Build & Release Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Optionele release-opmerkingen'
+        required: false
+  push:
+    branches:
+      - main
+    paths:
+      - 'siti-stock-plugin.php'
+      - 'includes/**'
+      - 'assets/**'
+      - 'README.md'
+      - '.github/workflows/release.yml'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine plugin version
+        id: meta
+        run: |
+          VERSION=$(grep -E "^\\s*\\*\\s*Version:" -m 1 siti-stock-plugin.php | sed -E 's/.*Version:\\s*//')
+          VERSION=$(echo "$VERSION" | tr -d '\\r')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Kon pluginversie niet bepalen."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag exists
+        id: tagcheck
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag bestaat al – workflow afronden
+        if: steps.tagcheck.outputs.exists == 'true'
+        run: |
+          echo "Tag v${{ steps.meta.outputs.version }} bestaat al. Release wordt overgeslagen."
+
+      - name: Build distributie-zip
+        if: steps.tagcheck.outputs.exists == 'false'
+        id: package
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          SLUG="siti-stock-plugin"
+          BUILD_ROOT="$RUNNER_TEMP/build"
+          DEST_DIR="$BUILD_ROOT/$SLUG"
+          mkdir -p "$DEST_DIR"
+
+          rsync -a ./ "$DEST_DIR" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'docker/' \
+            --exclude 'docs/' \
+            --exclude 'dist/' \
+            --exclude 'docker-compose.yml' \
+            --exclude 'PLAN.md'
+
+          mkdir -p dist
+          ZIP_PATH="dist/${SLUG}-${VERSION}.zip"
+          (cd "$BUILD_ROOT" && zip -r "$GITHUB_WORKSPACE/$ZIP_PATH" "$SLUG")
+
+          echo "asset_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "asset_name=${SLUG}-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Stel release-body samen
+        if: steps.tagcheck.outputs.exists == 'false'
+        id: releasebody
+        run: |
+          if [ -n "$RELEASE_NOTES" ]; then
+            echo "text=$RELEASE_NOTES" >> "$GITHUB_OUTPUT"
+          else
+            echo "text=Automatische release op basis van versie ${{ steps.meta.outputs.version }}." >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+
+      - name: Maak GitHub release
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: Siti Stock Plugin v${{ steps.meta.outputs.version }}
+          body: ${{ steps.releasebody.outputs.text }}
+          generate_release_notes: true
+          files: ${{ steps.package.outputs.asset_path }}

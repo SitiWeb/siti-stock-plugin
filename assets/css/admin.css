@@ -1,0 +1,19 @@
+.siti-stock-settings {
+  max-width: 800px;
+}
+
+.siti-stock-settings .description {
+  color: #555;
+}
+
+.siti-stock-cron-info {
+  margin-top: 20px;
+  border-left: 4px solid #2271b1;
+  background: #fff;
+  padding: 16px;
+  display: none;
+}
+
+.siti-stock-cron-info.is-visible {
+  display: block;
+}

@@ -1,0 +1,49 @@
+services:
+  db:
+    image: mariadb:10.11
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: supersecret
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3312:3306"
+
+  wordpress:
+    build:
+      context: .
+      dockerfile: docker/wordpress/Dockerfile
+    depends_on:
+      - db
+    ports:
+      - "8082:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+      WP_ENVIRONMENT_TYPE: local
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./:/var/www/html/wp-content/plugins/siti-stock-plugin
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5
+    depends_on:
+      - db
+    ports:
+      - "8010:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress
+
+volumes:
+  db_data:
+  wordpress_data:
